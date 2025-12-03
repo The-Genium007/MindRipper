@@ -11,12 +11,13 @@ services:
     networks:
       - mindripper-net
     # No ports exposed - only accessible by mindripper service
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:5000/languages || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s  # Give time to load models
+    # Health check disabled - mindripper has retry logic to handle delayed startup
+    # healthcheck:
+    #   test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:5000/languages || exit 1"]
+    #   interval: 30s
+    #   timeout: 10s
+    #   retries: 5
+    #   start_period: 120s  # Give time to load models
 
   # MindRipper - Main scraping application
   mindripper:
@@ -51,8 +52,7 @@ services:
       - mindripper-net
 
     depends_on:
-      libretranslate:
-        condition: service_healthy
+      - libretranslate  # Start after libretranslate, but don't wait for health check
 
     # Resource limits
     deploy:
