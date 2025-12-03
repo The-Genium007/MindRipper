@@ -11,7 +11,7 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 
 // Request logging middleware
-app.use((req, res, next) => {
+app.use((req, _res, next) => {
   logger.info(`${req.method} ${req.path}`, {
     ip: req.ip,
     userAgent: req.get('user-agent'),
@@ -22,7 +22,7 @@ app.use((req, res, next) => {
 /**
  * Health check endpoint
  */
-app.get('/health', async (req: Request, res: Response) => {
+app.get('/health', async (_req: Request, res: Response) => {
   const status = getSchedulerStatus();
 
   res.json({
@@ -48,20 +48,22 @@ app.get('/health', async (req: Request, res: Response) => {
 /**
  * Trigger manual scraping
  */
-app.post('/trigger', async (req: Request, res: Response) => {
+app.post('/trigger', async (_req: Request, res: Response) => {
   const targetUrl = process.env.TARGET_URL;
 
   if (!targetUrl) {
-    return res.status(400).json({
+    res.status(400).json({
       error: 'TARGET_URL not configured',
     });
+    return;
   }
 
   if (isWorkflowRunning()) {
-    return res.status(409).json({
+    res.status(409).json({
       error: 'Workflow already running',
       message: 'Please wait for the current workflow to complete',
     });
+    return;
   }
 
   // Start workflow asynchronously
@@ -82,7 +84,7 @@ app.post('/trigger', async (req: Request, res: Response) => {
 /**
  * Get scheduler status
  */
-app.get('/status', (req: Request, res: Response) => {
+app.get('/status', (_req: Request, res: Response) => {
   const status = getSchedulerStatus();
 
   res.json({
@@ -116,7 +118,7 @@ app.use((req: Request, res: Response) => {
 /**
  * Error handler
  */
-app.use((err: Error, req: Request, res: Response, next: any) => {
+app.use((err: Error, req: Request, res: Response, _next: any) => {
   logger.error('Express error', {
     error: err.message,
     stack: err.stack,
