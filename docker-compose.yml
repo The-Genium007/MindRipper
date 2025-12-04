@@ -4,7 +4,6 @@ services:
   # LibreTranslate - Self-hosted translation service
   libretranslate:
     image: libretranslate/libretranslate:latest
-    container_name: mindripper-libretranslate
     restart: unless-stopped
     environment:
       LT_LOAD_ONLY: en,fr  # Only load English and French models to save memory
@@ -24,7 +23,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: mindripper
     restart: unless-stopped
 
     ports:
