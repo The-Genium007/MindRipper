@@ -10,6 +10,10 @@
     "start": "node dist/index.js",
     "test": "echo \"Error: no test specified\" && exit 1",
     "test:workflow": "tsx scripts/test-workflow.ts",
+    "test:scraper": "tsx scripts/test-scraper.ts",
+    "test:translation": "tsx scripts/test-translation.ts",
+    "test:notion": "tsx scripts/test-notion.ts",
+    "test:complete": "tsx scripts/test-workflow-complete.ts",
     "check:libretranslate": "./scripts/check-libretranslate.sh"
   },
   "keywords": [
@@ -22,17 +26,21 @@
   "license": "ISC",
   "dependencies": {
     "@notionhq/client": "^2.2.15",
+    "@puppeteer/browsers": "^2.11.0",
     "axios": "^1.7.9",
     "cheerio": "^1.0.0",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "node-cron": "^3.0.3",
+    "puppeteer": "^24.32.0",
+    "puppeteer-core": "^24.32.0",
     "winston": "^3.17.0"
   },
   "devDependencies": {
-    "@types/express": "^5.0.0",
+    "@types/express": "^5.0.6",
     "@types/node": "^22.10.2",
     "@types/node-cron": "^3.0.11",
+    "@types/puppeteer": "^5.4.7",
     "tsx": "^4.20.6",
     "typescript": "^5.7.2"
   }

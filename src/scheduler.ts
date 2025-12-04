@@ -1,8 +1,8 @@
 import cron from 'node-cron';
 import logger from './logger.js';
-import { scrapeUrl } from './scraper.js';
-import { translateBatch } from './translator.js';
-import { createEntryFromScrapedContent, createErrorEntry } from './notion.js';
+import { scrapeIdeaBrowserUrl } from './scraper.js';
+import { translateIdeaBrowserContent } from './translator.js';
+import { createIdeaBrowserEntry, createIdeaBrowserErrorEntry } from './notion.js';
 
 export interface SchedulerConfig {
   targetUrl: string;
@@ -14,11 +14,20 @@ let scheduledTask: cron.ScheduledTask | null = null;
 let isRunning = false;
 
 /**
- * Execute the scraping workflow
+ * Legacy scraping workflow (kept for backwards compatibility)
+ * NOTE: Use executeIdeaBrowserWorkflow() for IdeaBrowser scraping
  */
 export async function executeScrapingWorkflow(url: string): Promise<void> {
+  logger.warn('executeScrapingWorkflow is deprecated. Use executeIdeaBrowserWorkflow() instead.');
+  return executeIdeaBrowserWorkflow(url);
+}
+
+/**
+ * Execute the IdeaBrowser workflow (Puppeteer scraper)
+ */
+export async function executeIdeaBrowserWorkflow(url: string): Promise<void> {
   if (isRunning) {
-    logger.warn('Scraping workflow already running, skipping this execution');
+    logger.warn('IdeaBrowser workflow already running, skipping this execution');
     return;
   }
 
@@ -27,50 +36,54 @@ export async function executeScrapingWorkflow(url: string): Promise<void> {
 
   try {
     logger.info('='.repeat(80));
-    logger.info('Starting scraping workflow', { url });
+    logger.info('Starting IdeaBrowser workflow', { url });
     logger.info('='.repeat(80));
 
-    // Step 1: Scrape content
-    logger.info('[1/3] Scraping content...');
-    const scrapedContent = await scrapeUrl(url);
+    // Step 1: Scrape IdeaBrowser content with Puppeteer
+    logger.info('[1/3] Scraping IdeaBrowser content with Puppeteer...');
+    const scrapedContent = await scrapeIdeaBrowserUrl(url);
     logger.info('[1/3] Scraping completed', {
       title: scrapedContent.title,
-      wordCount: scrapedContent.wordCount,
+      keywordsCount: scrapedContent.keywords?.length || 0,
+      wordCount: scrapedContent.metadata.wordCountEN,
+      businessFitSections: Object.keys(scrapedContent.businessFit).length
     });
 
-    // Step 2: Translate title and content
-    logger.info('[2/3] Translating content...');
-    const translations = await translateBatch({
-      title: scrapedContent.title,
-      content: scrapedContent.content,
-    }, 'fr');
-
+    // Step 2: Translate all content (title, business fit, keywords, categorization)
+    logger.info('[2/3] Translating IdeaBrowser content (this may take 1-2 minutes)...');
+    const translationResult = await translateIdeaBrowserContent(scrapedContent, 'fr', 'en');
     logger.info('[2/3] Translation completed', {
-      titleChars: translations.title.characterCount,
-      contentChars: translations.content.characterCount,
-      totalChars: translations.title.characterCount + translations.content.characterCount,
+      totalCharacters: translationResult.translationMetadata.totalCharacters,
+      batchCount: translationResult.translationMetadata.batchCount,
+      duration: `${(translationResult.translationMetadata.duration / 1000).toFixed(2)}s`,
+      failedFields: translationResult.translationMetadata.failedFields.length > 0
+        ? translationResult.translationMetadata.failedFields.join(', ')
+        : 'none'
     });
 
-    // Step 3: Create Notion entry
-    logger.info('[3/3] Creating Notion entry...');
-    const pageId = await createEntryFromScrapedContent(
-      scrapedContent,
-      translations.title,
-      translations.content
+    // Step 3: Create Notion entry with 42 properties
+    logger.info('[3/3] Creating IdeaBrowser Notion entry with 42 properties...');
+    const pageId = await createIdeaBrowserEntry(
+      translationResult.original,
+      translationResult.translated,
+      translationResult.translationMetadata
     );
-    logger.info('[3/3] Notion entry created', { pageId });
+    logger.info('[3/3] IdeaBrowser Notion entry created', { pageId });
 
     const duration = Date.now() - startTime;
     logger.info('='.repeat(80));
-    logger.info('Scraping workflow completed successfully', {
+    logger.info('IdeaBrowser workflow completed successfully', {
       duration: `${(duration / 1000).toFixed(2)}s`,
       url,
       pageId,
+      keywordsExtracted: scrapedContent.keywords?.length || 0,
+      businessFitSections: Object.keys(scrapedContent.businessFit).length,
+      translationDuration: `${(translationResult.translationMetadata.duration / 1000).toFixed(2)}s`
     });
     logger.info('='.repeat(80));
   } catch (error) {
     const duration = Date.now() - startTime;
-    logger.error('Scraping workflow failed', {
+    logger.error('IdeaBrowser workflow failed', {
       duration: `${(duration / 1000).toFixed(2)}s`,
       url,
       error: error instanceof Error ? error.message : String(error),
@@ -79,10 +92,10 @@ export async function executeScrapingWorkflow(url: string): Promise<void> {
     // Try to create error entry in Notion
     try {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      await createErrorEntry(url, errorMessage);
-      logger.info('Error entry created in Notion');
+      await createIdeaBrowserErrorEntry(url, errorMessage);
+      logger.info('IdeaBrowser error entry created in Notion');
     } catch (notionError) {
-      logger.error('Failed to create error entry in Notion', {
+      logger.error('Failed to create IdeaBrowser error entry in Notion', {
         error: notionError instanceof Error ? notionError.message : String(notionError),
       });
     }
@@ -129,15 +142,15 @@ export function startScheduler(config: SchedulerConfig): void {
     timezone,
   });
 
-  // Create scheduled task
+  // Create scheduled task - Use IdeaBrowser workflow
   scheduledTask = cron.schedule(
     cronExpression,
     async () => {
       logger.info('Cron job triggered');
       try {
-        await executeScrapingWorkflow(targetUrl);
+        await executeIdeaBrowserWorkflow(targetUrl);
       } catch (error) {
-        logger.error('Scheduled workflow failed', {
+        logger.error('Scheduled IdeaBrowser workflow failed', {
           error: error instanceof Error ? error.message : String(error),
         });
       }

@@ -260,3 +260,147 @@ export async function translateBatch(
 
   return results;
 }
+
+/**
+ * Translate IdeaBrowser content with optimized batching
+ * Translates all text fields from EN to FR
+ */
+export async function translateIdeaBrowserContent(
+  content: any, // IdeaBrowserContent type
+  targetLang: string = 'fr',
+  sourceLang: string = 'en'
+): Promise<any> { // TranslatedIdeaBrowserContent type
+  const startTime = Date.now();
+  const failedFields: string[] = [];
+  let totalCharacters = 0;
+
+  logger.info('Starting IdeaBrowser content translation', {
+    title: content.title,
+    keywordsCount: content.keywords?.length || 0,
+    businessFitSections: Object.keys(content.businessFit || {}).length
+  });
+
+  // Helper function to translate with fallback
+  const translateWithFallback = async (text: string, fieldName: string): Promise<string> => {
+    if (!text || !text.trim()) return '';
+
+    totalCharacters += text.length;
+
+    try {
+      const result = await translateText(text, targetLang, sourceLang);
+      return result.translated;
+    } catch (error) {
+      logger.warn(`Translation failed for ${fieldName}, keeping original`, {
+        error: error instanceof Error ? error.message : String(error)
+      });
+      failedFields.push(fieldName);
+      return text; // Fallback to original
+    }
+  };
+
+  const translated: any = {
+    title: '',
+    businessFit: {
+      opportunities: '',
+      problems: '',
+      whyNow: '',
+      feasibility: '',
+      revenuePotential: '',
+      executionDifficulty: '',
+      goToMarket: ''
+    },
+    keywords: [],
+    categorization: {
+      type: '',
+      market: '',
+      targetAudience: '',
+      mainCompetitor: '',
+      trendAnalysis: ''
+    }
+  };
+
+  // Batch 1: Title (short, quick)
+  logger.info('Translating title...');
+  translated.title = await translateWithFallback(content.title, 'title');
+  await new Promise(resolve => setTimeout(resolve, 1500)); // Rate limiting delay
+
+  // Batch 2-8: Business Fit sections (one by one for better control)
+  logger.info('Translating Business Fit sections...');
+  const bfSections = [
+    'opportunities',
+    'problems',
+    'whyNow',
+    'feasibility',
+    'revenuePotential',
+    'executionDifficulty',
+    'goToMarket'
+  ];
+
+  for (const section of bfSections) {
+    const text = content.businessFit?.[section] || '';
+    if (text) {
+      logger.debug(`Translating Business Fit: ${section} (${text.length} chars)`);
+      translated.businessFit[section] = await translateWithFallback(text, `businessFit.${section}`);
+      await new Promise(resolve => setTimeout(resolve, 1500)); // Rate limiting delay
+    }
+  }
+
+  // Batch 9: Keywords (all names together - short texts)
+  logger.info('Translating keywords...');
+  if (content.keywords && content.keywords.length > 0) {
+    for (const kw of content.keywords) {
+      try {
+        const translatedName = await translateWithFallback(kw.name, `keyword.${kw.name}`);
+        translated.keywords.push({
+          name: translatedName,
+          volume: kw.volume,
+          growth: kw.growth,
+          trend: kw.trend
+        });
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Shorter delay for keywords
+      } catch (error) {
+        // If keyword translation fails, keep original
+        translated.keywords.push(kw);
+      }
+    }
+  }
+
+  // Batch 10-11: Categorization (short fields together)
+  logger.info('Translating categorization...');
+  const catFields = ['type', 'market', 'targetAudience', 'mainCompetitor'];
+  for (const field of catFields) {
+    const text = content.categorization?.[field] || '';
+    if (text) {
+      translated.categorization[field] = await translateWithFallback(text, `categorization.${field}`);
+      await new Promise(resolve => setTimeout(resolve, 1500));
+    }
+  }
+
+  // Batch 12: Trend Analysis (potentially long text, separate)
+  if (content.categorization?.trendAnalysis) {
+    logger.info('Translating trend analysis...');
+    translated.categorization.trendAnalysis = await translateWithFallback(
+      content.categorization.trendAnalysis,
+      'categorization.trendAnalysis'
+    );
+  }
+
+  const duration = Date.now() - startTime;
+
+  logger.info('IdeaBrowser content translation completed', {
+    duration: `${(duration / 1000).toFixed(2)}s`,
+    totalCharacters,
+    failedFields: failedFields.length > 0 ? failedFields : 'none'
+  });
+
+  return {
+    original: content,
+    translated,
+    translationMetadata: {
+      totalCharacters,
+      batchCount: bfSections.length + 2 + (content.keywords?.length || 0) + catFields.length + 1,
+      duration,
+      failedFields
+    }
+  };
+}

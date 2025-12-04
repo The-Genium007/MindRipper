@@ -1,16 +1,31 @@
-# MindRipper
+# MindRipper - IdeaBrowser Edition
 
-Automated web scraper with translation and Notion integration. Scrapes a target URL daily, translates content to French using self-hosted LibreTranslate (100% free & unlimited), and stores both versions in a Notion database.
+Specialized automated scraper for **ideabrowser.com** business idea analysis. Extracts detailed business intelligence, translates EN→FR using self-hosted LibreTranslate (100% free & unlimited), and stores comprehensive bilingual data in Notion with 42 structured properties.
 
 ## Features
 
-- **Automated Scraping**: Daily scraping via configurable cron schedule
-- **Smart Content Extraction**: Intelligently extracts title, author, date, and main content
+- **IdeaBrowser Specialized**: Extracts 42 data points including Business Fit analysis, Keywords metrics, and Categorization
+- **Automated Scraping**: Daily scraping via configurable cron schedule with Puppeteer (JavaScript rendering)
+- **Deep Data Extraction**: Business opportunities, problems, market analysis, keywords with search volumes and growth rates
+- **Comprehensive Translation**: 26-batch intelligent translation (EN→FR) with graceful fallbacks
 - **100% Free Translation**: Self-hosted LibreTranslate included - no API key, unlimited translations
-- **Notion Integration**: Stores bilingual content with full history in Notion database
-- **Complete Docker Setup**: LibreTranslate + MindRipper in one docker-compose
-- **Robust Error Handling**: Retry logic, exponential backoff, error logging
-- **Health Monitoring**: HTTP endpoints for health checks and manual triggers
+- **Rich Notion Integration**: 42 properties + full-text blocks with bilingual content
+- **Complete Docker Setup**: LibreTranslate + MindRipper + Chromium in one docker-compose
+- **Robust Error Handling**: Retry logic, exponential backoff, error logging with Notion tracking
+- **Health Monitoring**: HTTP endpoints for health checks, manual triggers, and status queries
+
+## What Gets Scraped
+
+Unlike generic scrapers, MindRipper extracts structured business intelligence from ideabrowser.com:
+
+- **Business Fit** (7 sections): Opportunities, Problems, Why Now, Feasibility, Revenue Potential, Execution Difficulty, Go-to-Market
+- **Keywords** (with metrics): Names, monthly search volumes, growth rates, trends
+- **Categorization** (5 dimensions): Type, Market, Target Audience, Main Competitor, Trend Analysis
+- **Metadata**: Open Graph tags, publication dates, word counts, translation metrics
+
+All content is translated EN→FR and stored bilingually in Notion with 42 properties.
+
+See [IDEABROWSER.md](./IDEABROWSER.md) for complete documentation.
 
 ## Quick Start
 
@@ -18,8 +33,9 @@ Automated web scraper with translation and Notion integration. Scrapes a target 
 
 - Docker & Docker Compose (required for deployment)
 - Notion account (for data storage)
-- ~1.5GB RAM for both services (MindRipper + LibreTranslate)
+- **~2GB RAM** for all services (MindRipper + LibreTranslate + Chromium)
 - (Optional) Node.js 20+ for local development without Docker
+- **Note**: Increased RAM requirement due to Puppeteer/Chromium for JavaScript rendering
 
 ### Local Development
 
@@ -41,21 +57,29 @@ Automated web scraper with translation and Notion integration. Scrapes a target 
    - ✅ No API key needed
    - ✅ Only loads EN→FR models to save memory
 
-4. **Setup Notion**:
+4. **Setup Notion** (42 properties required for IdeaBrowser):
    - Go to [Notion Integrations](https://www.notion.so/my-integrations)
-   - Create new integration named "MindRipper"
+   - Create new integration named "MindRipper IdeaBrowser"
    - Copy Internal Integration Token to `.env` as `NOTION_API_KEY`
-   - Create a database in Notion (or let the app create it)
-   - Share the database with your integration
+   - Create a database in Notion with 42 properties (see [IDEABROWSER.md](./IDEABROWSER.md) for complete list)
+   - Share the database with your integration (click "..." → "Connections")
    - Copy database ID from URL to `.env` as `NOTION_DATABASE_ID`
+   - **Test connection**: `npx tsx scripts/diagnose-notion.ts`
 
 5. **Run in development mode**:
    ```bash
    npm run dev
    ```
 
-6. **Test the scraper**:
+6. **Test the complete workflow**:
    ```bash
+   # Test Notion connection first
+   npx tsx scripts/diagnose-notion.ts
+
+   # Test complete scraping workflow
+   npx tsx scripts/test-workflow-complete.ts
+
+   # Or trigger via HTTP endpoint
    curl -X POST http://localhost:3000/trigger
    ```
 
@@ -182,23 +206,23 @@ Get scheduler status and configuration.
 
 ## Notion Database Structure
 
-The app creates/uses a Notion database with these properties:
+### IdeaBrowser Edition: 42 Properties
 
-| Property | Type | Description |
-|----------|------|-------------|
-| Name | Title | Article title (EN) |
-| Date | Date | Scraping date |
-| URL | URL | Source URL |
-| Titre EN | Rich Text | Original title |
-| Titre FR | Rich Text | Translated title |
-| Contenu EN | Rich Text | Original content (preview) |
-| Contenu FR | Rich Text | Translated content (preview) |
-| Auteur | Rich Text | Author (if available) |
-| Date publication | Date | Publication date (if available) |
-| Statut | Select | success or error |
-| Word count | Number | Word count of original content |
+The app creates/uses a Notion database with **42 structured properties** for comprehensive business intelligence storage:
 
-Full content is stored as page blocks (unlimited length).
+**Property Groups:**
+- **General** (6): Name, Date scraping, Date publication, URL, Statut, Image Preview
+- **Business Fit EN** (7): Opportunities, Problems, Why Now, Feasibility, Revenue Potential, Execution Difficulty, Go-to-Market
+- **Business Fit FR** (7): French translations of all Business Fit sections
+- **Keywords** (6): Keywords list, Top Keyword, Keywords Count, Avg Volume, High Growth Count, Total Volume
+- **Categorization EN** (5): Type, Market, Target Audience, Main Competitor, Trend Analysis
+- **Categorization FR** (5): French translations of all Categorization fields
+- **Metrics** (5): Word Count EN/FR, Total Score, Translation Duration, Failed Translations
+- **Errors** (1): Error messages
+
+Full content and detailed keyword data are stored as structured page blocks.
+
+**See [IDEABROWSER.md](./IDEABROWSER.md) for complete property list, types, and recommended views.**
 
 ## Deployment on Dokploy
 
@@ -252,35 +276,56 @@ Click "Deploy" in Dokploy. The application will:
 ```
 MindRipper/
 ├── src/
-│   ├── scraper.ts      # Web scraping with Cheerio
-│   ├── translator.ts   # Google Translate integration
-│   ├── notion.ts       # Notion API client
-│   ├── scheduler.ts    # Cron job orchestration
-│   ├── logger.ts       # Centralized logging
-│   └── index.ts        # HTTP server & entry point
-├── Dockerfile          # Multi-stage production image
-├── docker-compose.yml  # Service orchestration
+│   ├── scraper.ts         # IdeaBrowser scraping with Puppeteer
+│   ├── translator.ts      # LibreTranslate integration (26-batch system)
+│   ├── notion.ts          # Notion API client (42 properties)
+│   ├── scheduler.ts       # Cron job orchestration
+│   ├── logger.ts          # Centralized logging
+│   ├── index.ts           # HTTP server & entry point
+│   └── types/
+│       ├── scraper.types.ts    # IdeaBrowser content interfaces
+│       └── translation.types.ts # Translation metadata types
+├── scripts/
+│   ├── diagnose-notion.ts          # Notion connection tester
+│   └── test-workflow-complete.ts   # E2E workflow test
+├── Dockerfile          # Multi-stage with Chromium
+├── docker-compose.yml  # LibreTranslate + MindRipper
 ├── package.json
 ├── tsconfig.json
-└── .env.example
+├── .env.example
+├── README.md           # This file
+├── CLAUDE.md           # AI assistant guidance
+└── IDEABROWSER.md      # Complete IdeaBrowser docs
 ```
 
 ### Available Scripts
 
 ```bash
+# Development
 npm run dev      # Development with hot reload
 npm run build    # Build TypeScript
 npm start        # Start production build
+
+# Testing
+npm run test:complete  # Complete E2E workflow test
+npx tsx scripts/diagnose-notion.ts  # Test Notion connection
+
+# Docker
+docker-compose build   # Build services
+docker-compose up -d   # Start in background
+docker-compose logs -f # Follow logs
 ```
 
-### Adding Features
+### Extending for Other Sites
 
-The codebase is modular and easy to extend:
+While specialized for IdeaBrowser, the codebase can be adapted:
 
-- **Add new scrapers**: Extend `src/scraper.ts`
-- **Support more languages**: Modify `src/translator.ts`
-- **Custom Notion fields**: Update `src/notion.ts`
-- **Additional schedules**: Modify `src/scheduler.ts`
+- **Scraper**: Modify `src/scraper.ts` with new Puppeteer selectors
+- **Notion schema**: Update `src/notion.ts` property mapping
+- **Translation batching**: Adjust `src/translator.ts` batch strategy
+- **Cron schedule**: Modify `SCRAPE_CRON` in `.env`
+
+**Note**: Non-IdeaBrowser sites may require different Notion database structure.
 
 ## Troubleshooting
 
@@ -305,12 +350,21 @@ The codebase is modular and easy to extend:
 
 ### Scraping Fails
 
-**Error:** `Could not extract content from page`
+**Error:** `Could not extract content from page` or `Timeout waiting for selector`
 
 **Solution:**
-- Verify target URL is accessible
-- Check if page requires JavaScript rendering (Cheerio only works with static HTML)
-- Inspect page structure and adjust selectors in `src/scraper.ts`
+- Verify target URL is accessible and is from ideabrowser.com
+- IdeaBrowser requires JavaScript rendering (uses Puppeteer, not Cheerio)
+- Check if ideabrowser.com changed their HTML structure
+- Inspect page with browser DevTools and adjust selectors in `src/scraper.ts`
+- Increase `PUPPETEER_TIMEOUT` if page loads slowly
+
+**Error:** `Chromium not found` or `Browser launch failed`
+
+**Solution:**
+- Local: Run `npx puppeteer browsers install chrome`
+- Docker: Ensure Dockerfile installs Chromium (`apk add chromium`)
+- Check `PUPPETEER_EXECUTABLE_PATH` environment variable
 
 ### Cron Not Running
 
@@ -324,15 +378,15 @@ The codebase is modular and easy to extend:
 ### 100% Free Solution
 - **LibreTranslate**: FREE & UNLIMITED (self-hosted)
 - **Notion**: FREE - Unlimited pages (Personal plan)
-- **Hosting**: $5-15/month (VPS with 2GB RAM)
+- **Hosting**: $10-20/month (VPS with 2GB RAM for IdeaBrowser edition)
 
-**Total cost: $5-15/month for hosting only**
+**Total cost: $10-20/month for hosting only**
 
-### Resource Requirements
-- **RAM**: ~1.5GB total (MindRipper: ~256MB, LibreTranslate: ~1GB)
-- **Storage**: ~500MB for Docker images + models
-- **CPU**: Minimal (translation is fast with loaded models)
-- **Bandwidth**: Minimal (only scraping 1 article/day)
+### Resource Requirements (IdeaBrowser Edition)
+- **RAM**: ~2GB total (MindRipper + Chromium: ~768MB, LibreTranslate: ~1GB)
+- **Storage**: ~700MB for Docker images + models + Chromium
+- **CPU**: 0.5-1.0 core (Puppeteer + translation)
+- **Bandwidth**: Minimal (scraping 1 article/day, ~45 seconds per workflow)
 
 ## Security
 

@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import express, { Request, Response } from 'express';
 import logger from './logger.js';
-import { startScheduler, stopScheduler, executeScrapingWorkflow, getSchedulerStatus, isWorkflowRunning } from './scheduler.js';
+import { startScheduler, stopScheduler, executeIdeaBrowserWorkflow, getSchedulerStatus, isWorkflowRunning } from './scheduler.js';
 import { testNotionConnection } from './notion.js';
 
 const app = express();
@@ -66,16 +66,17 @@ app.post('/trigger', async (_req: Request, res: Response) => {
     return;
   }
 
-  // Start workflow asynchronously
+  // Start IdeaBrowser workflow asynchronously
   res.json({
-    message: 'Scraping workflow started',
+    message: 'IdeaBrowser scraping workflow started',
     url: targetUrl,
     timestamp: new Date().toISOString(),
+    note: 'This will take approximately 1-2 minutes (scraping + translation + Notion)'
   });
 
-  // Execute workflow in background
-  executeScrapingWorkflow(targetUrl).catch((error) => {
-    logger.error('Manual workflow execution failed', {
+  // Execute IdeaBrowser workflow in background
+  executeIdeaBrowserWorkflow(targetUrl).catch((error) => {
+    logger.error('Manual IdeaBrowser workflow execution failed', {
       error: error instanceof Error ? error.message : String(error),
     });
   });

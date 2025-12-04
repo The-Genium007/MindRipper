@@ -41,6 +41,15 @@ services:
       TARGET_URL: ${TARGET_URL}
       SCRAPE_CRON: ${SCRAPE_CRON:-0 9 * * *}
 
+      # Puppeteer configuration
+      PUPPETEER_EXECUTABLE_PATH: /usr/bin/chromium-browser
+      PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: 'true'
+      PUPPETEER_HEADLESS: ${PUPPETEER_HEADLESS:-true}
+      PUPPETEER_TIMEOUT: ${PUPPETEER_TIMEOUT:-60000}
+      PUPPETEER_WAIT_UNTIL: ${PUPPETEER_WAIT_UNTIL:-networkidle2}
+      PUPPETEER_VIEWPORT_WIDTH: ${PUPPETEER_VIEWPORT_WIDTH:-1920}
+      PUPPETEER_VIEWPORT_HEIGHT: ${PUPPETEER_VIEWPORT_HEIGHT:-1080}
+
       # LibreTranslate API (self-hosted via Docker)
       LIBRE_TRANSLATE_URL: http://libretranslate:5000/translate
 
@@ -54,15 +63,15 @@ services:
     depends_on:
       - libretranslate  # Start after libretranslate, but don't wait for health check
 
-    # Resource limits
+    # Resource limits (increased for Puppeteer/Chromium)
     deploy:
       resources:
         limits:
-          cpus: '1'
-          memory: 512M
+          cpus: '1.5'
+          memory: 1G
         reservations:
-          cpus: '0.25'
-          memory: 128M
+          cpus: '0.5'
+          memory: 256M
 
     # Logging configuration
     logging:
